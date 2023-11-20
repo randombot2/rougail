@@ -21,7 +21,7 @@ macro `as`*(forLoop: ForLoopStmt): untyped =
     result = newBlockStmt(name, result)
     
 
-proc `!`*[T](a, b: T): BranchPair[T] {.inline.} = BranchPair[T](then: a, otherwise: b)
+proc `!`*[T](a, b: sink T): BranchPair[T] {.inline.} = BranchPair[T](then: a, otherwise: b)
 
 template `?`*[T](cond: bool; p: BranchPair[T]): T =
   (if cond: p.then else: p.otherwise)
