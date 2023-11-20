@@ -1,6 +1,5 @@
-import std/[macros, with]
-from std/sugar import `->`, collect
-export with
+import std/macros
+import std/[sugar, with] 
 
 
 template dup*[T](val: sink T, calls: varargs[untyped]): T =
