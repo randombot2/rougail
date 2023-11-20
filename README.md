@@ -25,7 +25,7 @@ I also try to not rely on Nimble too much and use `git clone` for vendoring. Of 
 ## Credits
 
 - [mratsim](https://github.com/mratsim) for making the [constantine](https://github.com/mratsim/constantine) threadpool.
-- [beef331](https://github.com/beef331) for making [slicerator](https://github.com/beef331/slicerator) and for his work in the Nim compiler
-- [PMunch](https://github.com/PMunch/) for [optionutils](https://github.com/PMunch/nim-optionsutils)
+- [beef331](https://github.com/beef331) for making [slicerator](https://github.com/beef331/slicerator), for his work in the Nim compiler and more.
+- [PMunch](https://github.com/PMunch/) for [optionutils](https://github.com/PMunch/nim-optionsutils) and more.
 
 and more ...

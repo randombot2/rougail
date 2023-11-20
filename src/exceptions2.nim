@@ -113,18 +113,3 @@ macro Try*(body: untyped, branches: varargs[untyped]): untyped =
   
 
 
-when isMainModule:
-  proc lol =
-    raise newException(RCachableError, "heh")
-
-  Try:
-      echo "lool"
-      let x = 2
-      lol() 
-  except RCachableError:
-      echo "lol"
-  except CatchableError as e:
-      echo "hello j"
-      echo e.msg
-  except Defect:
-      let zeh = "mannn im hungry"

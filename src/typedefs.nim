@@ -38,6 +38,9 @@ type
 
     Callable*[T; R] = (proc(x: sink T): R {.closure.}) | (proc(x: sink T): R {.nimcall.}) | (proc(x: sink T): R {.inline.}) 
     
+    BranchPair*[T] = object
+        then*, otherwise*: T
+
     ## Abstract class for all exceptions that can be tagged and preallocated.
     RCachableError* {.acyclic.} = object of CatchableError
         data*: array[sizeof(CatchableError) * 3, byte] # preallocated refs

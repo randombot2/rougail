@@ -731,15 +731,3 @@ iterator itemss*[T](a: seq[T]): T {.inline.} =
     inc(i)
     assert(len(a) == L, "the length of the seq changed while iterating over it")
 
-when isMainModule:
-  let
-    nums = [1,2,3,4,5]
-    ints = @[-2, -1, 1, 3, -4, 5]
-    chars = ['a', '.', 'b', 'C', 'z', 'd']
-    strs = ["foo", "BAR", "Niklaus", "deadbeef"]
-    text = "Epicurus sought tranquility through simplicity and pleasure."
-  
-  for it in text.items.takeWhileIt(it != 'u'):
-    echo it
-  #assert chars.items.take(6).collect() == @chars
-  #assert strs.items.take(0).collect() == newSeq[string](0)
