@@ -1,7 +1,3 @@
-# https://github.com/fsh/strides
-
-## 
-## strutils reimplementation based on `openArray[char]`, `sink/lent`, `Option[T]`, whatever 👻 ...
 import std/options
 
 proc find*(s, sub: openArray[char]): int {.inline.} =

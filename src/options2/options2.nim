@@ -85,21 +85,10 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
   else:
     result = none(T)
 
-##
 
-proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect].} =
-  ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
-  ## - If the value is a none(T) this function panics with a message.
-  ## - `expect` should be used to describe the reason you expect the Option should be Some.
-  if self.isSome:
-    result = self.unsafeGet
-  else:
-    raise (ref UnpackDefect)(msg = m)
-
-
-
-
-
+#####/////////////////////////#####
+#####//  dot-like chaining  //#####
+#####/////////////////////////#####
 
 converter toBool*(option: ExistentialOption[bool]): bool =
   Option[bool](option).isSome and Option[bool](option).unsafeGet
@@ -148,3 +137,72 @@ macro `?.`*[T](option: Option[T], statements: untyped): untyped =
     )()
     
 
+#####/////////////////////////#####
+#####// optional operators  //#####
+#####/////////////////////////#####
+
+template `!`*[T](option: Option[T]): T =
+  ## Returns the value of an Option when you're absolutely sure that it
+  ## contains value. Using `!` on an Option without a value raises a Defect.
+  option.get
+
+template `->?`*[T,U](option: Option[T], expr: Option[U]): Option[U] =
+  if option.isSome:
+    expr
+  else:
+    U.none
+
+template `->?`*[T,U](option: Option[T], expr: U): Option[U] =
+  option ->? expr.some
+
+template `->?`*[T,U,V](options: (Option[T], Option[U]), expr: Option[V]): Option[V] =
+  if options[0].isSome and options[1].isSome:
+    expr
+  else:
+    V.none
+
+template `->?`*[T,U,V](options: (Option[T], Option[U]), expr: V): Option[V] =
+  options ->? expr.some
+
+
+proc `|?`*[T](option: Option[T], fallback: T): T {.inline.} =
+  ## Use the `|?` operator to supply a fallback value when an Option does not hold a value.
+  if option.isSome:
+    option.unsafeGet()
+  else:
+    fallback
+
+#####/////////////////////////#####
+#####//  lifted operators   //#####
+#####/////////////////////////#####
+
+Option.liftUnary(`-`)
+Option.liftUnary(`+`)
+Option.liftUnary(`@`)
+Option.liftBinary(`[]`)
+Option.liftBinary(`*`)
+Option.liftBinary(`/`)
+Option.liftBinary(`div`)
+Option.liftBinary(`mod`)
+Option.liftBinary(`shl`)
+Option.liftBinary(`shr`)
+Option.liftBinary(`+`)
+Option.liftBinary(`-`)
+Option.liftBinary(`&`)
+Option.liftBinary(`<=`)
+Option.liftBinary(`<`)
+Option.liftBinary(`>=`)
+Option.liftBinary(`>`)
+
+#####/////////////////////////#####
+#####//         etc         //#####
+#####/////////////////////////#####
+
+proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect].} =
+  ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
+  ## - If the value is a none(T) this function panics with a message.
+  ## - `expect` should be used to describe the reason you expect the Option should be Some.
+  if self.isSome:
+    result = self.unsafeGet
+  else:
+    raise (ref UnpackDefect)(msg = m)
