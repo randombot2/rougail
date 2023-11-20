@@ -151,7 +151,7 @@ macro `?.`*[T](option: Option[T], statements: untyped): untyped =
 
 
 
-proc `|?`*[T](option: sink Option[T], fallback: sink T): T {.inline.} =
+proc `|?`*[T](option: sink Option[T], fallback: sink T): T  =
   ## Use the `|?` operator to supply a fallback value when an Option does not hold a value.
   if option.isSome:
     option.unsafeGet()
@@ -164,11 +164,36 @@ proc `|?`*[T](option: sink Option[T], fallback: sink T): T {.inline.} =
 #####//         etc         //#####
 #####/////////////////////////#####
 
-proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect].} =
+proc replace[T](dest: var T, src: sink T): T =
+  ## like `swap` but returns the swapped value 
+  # TODO: should go in some other module
+  swap(dest, src)
+  result = dest
+  
+
+proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discardable.} =
   ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
   ## - If the value is a none(T) this function panics with a message.
   ## - `expect` should be used to describe the reason you expect the Option should be Some.
   if self.isSome:
     result = self.unsafeGet
   else:
-    raise (ref UnpackDefect)(msg = m)
+    raise (ref UnpackDefect)(msg: m)
+
+proc take*[T](self: sink Option[T]): Option[T] =
+  ## Takes the value out of the option, leaving a None in its place.
+  ## is a no-op if `self` is already `None`
+  replace(result, none(T))
+
+proc take_if*[T](self: sink Option[T], pred: Callable[var T, bool]): Option[T] = discard "can see this being useful, will implement"
+  
+  
+  
+  
+
+
+#####/////////////////////////#####
+#####//    sanity checks    //#####
+#####/////////////////////////#####
+when isMainModule:
+  some("stuff").take.expect("works")
