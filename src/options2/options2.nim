@@ -37,7 +37,7 @@ proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effect
     result = self
 
 
-proc flatten*[T](self: Option[Option[T]]): Option[T] {.inline.} =
+proc flatten*[T](self: Option[Option[T]]): Option[T] =
   case self.isSome
   of true:  self.unsafeGet
   of false: none(T)
@@ -165,34 +165,14 @@ template `->?`*[T,U,V](options: (Option[T], Option[U]), expr: V): Option[V] =
   options ->? expr.some
 
 
-proc `|?`*[T](option: Option[T], fallback: T): T {.inline.} =
+proc `|?`*[T](option: sink Option[T], fallback: sink T): T {.inline.} =
   ## Use the `|?` operator to supply a fallback value when an Option does not hold a value.
   if option.isSome:
     option.unsafeGet()
   else:
     fallback
 
-#####/////////////////////////#####
-#####//  lifted operators   //#####
-#####/////////////////////////#####
 
-Option.liftUnary(`-`)
-Option.liftUnary(`+`)
-Option.liftUnary(`@`)
-Option.liftBinary(`[]`)
-Option.liftBinary(`*`)
-Option.liftBinary(`/`)
-Option.liftBinary(`div`)
-Option.liftBinary(`mod`)
-Option.liftBinary(`shl`)
-Option.liftBinary(`shr`)
-Option.liftBinary(`+`)
-Option.liftBinary(`-`)
-Option.liftBinary(`&`)
-Option.liftBinary(`<=`)
-Option.liftBinary(`<`)
-Option.liftBinary(`>=`)
-Option.liftBinary(`>`)
 
 #####/////////////////////////#####
 #####//         etc         //#####
