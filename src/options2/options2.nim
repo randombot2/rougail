@@ -5,7 +5,7 @@
 
 from std/options import Option, UnpackDefect, isSome, isNone, some, none, get, unsafeGet
 import macros, std/genasts
-import typedefs
+import ../typedefs
 
 #####/////////////////////////#####
 #####// Generic Combinators //#####
@@ -71,10 +71,14 @@ proc and_then*[T, U](self: sink Option[T], cb: Callable[T, Option[U]]): Option[U
 proc `or`*[T](self, opt: sink Option[T]): Option[T] =
   ## Returns `self` if it contains a value, otherwise returns `opt`.
   case self.isSome
-    of true:  self
-    of false: opt
+  of true:  self
+  of false: opt
 
-proc or_else[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effectsOf: cb.} = discard "unimplemented"
+proc or_else[T](self: sink Option[T], cb: Callable[void, Option[T]]): Option[T] {.effectsOf: cb.} = 
+  ## Returns `self` if it contains a value, otherwise calls `cb` and returns it's result.
+  case self.isSome
+  of true:  self
+  of false: cb
 
 proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
   ## Returns some(T) if exactly one of `self` and `opt` isSome() is true, otherwise returns none(T).
