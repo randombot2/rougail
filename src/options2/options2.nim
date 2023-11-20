@@ -11,7 +11,7 @@ import ../typedefs
 #####// Generic Combinators //#####
 #####/////////////////////////#####
 
-# NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾
+# NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾 (procs desc are copypasted from rust's so i should modify them in the future)
 
 proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
