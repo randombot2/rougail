@@ -722,12 +722,5 @@ template nth*[T](iter: iterable[T]; n: Natural): Option[T] =
     inc counter
   result
 
-iterator itemss*[T](a: seq[T]): T {.inline.} =
-  ## Iterates over each item of `a`.
-  var i = 0
-  let L = len(a)
-  while i < L:
-    yield a[i]
-    inc(i)
-    assert(len(a) == L, "the length of the seq changed while iterating over it")
+
 

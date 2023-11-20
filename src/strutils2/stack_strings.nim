@@ -1,21 +1,32 @@
-const warnOnStackStringDollar* {.booldefine.} = false
+{.push raises: [], inline.}
+
+import std/[options]
+
+const 
+    warnOnStackStringDollar* {.booldefine.} = false
     ## When `true`, shows a compiler warning when a [StackString] is converted to a string via the `$` proc
 
-const fatalOnStackStringDollar* {.booldefine.} = false
+    fatalOnStackStringDollar* {.booldefine.} = false
     ## When `true`, shows a compiler fatal error when a [StackString] is converted to a string via the `$` proc
 
-const stackStringsPreventAllocation* {.booldefine.} = false
+    stackStringsPreventAllocation* {.booldefine.} = false
     ## When `true`, prevents any heap allocations from occuring in this module by showing compiler errors on operations that can allocate memory at runtime
 
-type InsufficientCapacityDefect* = object of Defect
-    ## Defect raised when attempting to append to or change the length of a StackString that does not have enough capacity to accomodate the new length
+type 
+    InsufficientCapacityDefect* = object of Defect
+        capacity*: Natural
+        requestedCapacity*: Natural
 
-    capacity*: Natural
-        ## The [StackString]'s capacity
+    StackString*[Size: static Natural] = object
+        ## A stack-allocated string with a fixed capacity
+        lenInternal: Natural
+        data*: array[Size + 1, char]
+            ## The underlying string data.
+            ## If you just want to iterate over the string's characters, use the [items] iterator.
+
+    IndexableChars* = cstring | string | openArray[char] | StackString 
+        # note: the openarray type mixing may cause issues due to compiler bugs
     
-    requestedCapacity*: Natural
-        ## The capacity required to successfully complete the operation
-
 proc newInsufficientCapacityDefect*(msg: string, capacity: Natural, requestedCapacity: Natural): ref InsufficientCapacityDefect =
     ## Allocates a new [InsufficientCapacityDefect] relating to the specified [StackString]
 
@@ -33,18 +44,6 @@ template raiseInsufficientCapacityDefect(msg: string, capacity: Natural, request
 
     raise newInsufficientCapacityDefect(msg, capacity, requestedCapacity)
 
-type StackString*[Size: static Natural] = object
-    ## A stack-allocated string with a fixed capacity
-
-    lenInternal: Natural
-        ## The current string length
-
-    data*: array[Size + 1, char]
-        ## The underlying string data.
-        ## If you just want to iterate over the string's characters, use the [items] iterator.
-
-type IndexableChars* = cstring | string | openArray[char] | StackString
-    ## Indexable data types that contain chars
 
 func toString*(this: StackString): string =
     ## Allocates a new string with the content of the provided [StackString].
@@ -61,7 +60,7 @@ func toString*(this: StackString): string =
     for c in this.items:
         result.add(c)
 
-func `$`*(this: StackString): string {.inline.} =
+func `$`*(this: StackString): string =
     ## Converts the [StackString] to a `string`.
     ## Note that this proc allocates a new string and copies the contents of the StackString into the newly created string.
     ## 
@@ -105,12 +104,12 @@ func stackStringOfCap*(capacity: static Natural): static auto =
     
     return StackString[capacity](lenInternal: 0, data: array[capacity + 1, char].default)
 
-func len*(this: StackString): Natural {.inline.} =
+func len*(this: StackString): Natural =
     ## The current string length
     
     return this.lenInternal
 
-func high*(this: StackString): int {.inline.} =
+func high*(this: StackString): int =
     ## Returns the highest index of the [StackString], or `-1` if it is empty
     runnableExamples:
         var str1 = "Hello world"
@@ -121,7 +120,7 @@ func high*(this: StackString): int {.inline.} =
 
     return this.len - 1
 
-func capacity*(this: StackString): Natural {.inline.} =
+func capacity*(this: StackString): Natural =
     ## Returns the capacity of the [StackString]
     runnableExamples:
         var ssLit = ss"Same capacity"
@@ -136,7 +135,7 @@ func capacity*(this: StackString): Natural {.inline.} =
 
     return this.data.len - 1
 
-iterator items*(this: StackString): char {.inline.} =
+iterator items*(this: StackString): char =
     ## Iterates over each char in the [StackString]
     runnableExamples:
         let str = ss"abc"
@@ -154,7 +153,7 @@ iterator items*(this: StackString): char {.inline.} =
         yield this.data[i]
         inc i
 
-iterator mitems*(this: var StackString): var char {.inline.} =
+iterator mitems*(this: var StackString): var char =
     ## Iterates over each char in the [StackString], returning a mutable reference
     runnableExamples:
         var str = ss"fly in the sky"
@@ -173,7 +172,7 @@ iterator mitems*(this: var StackString): var char {.inline.} =
         yield this.data[i]
         inc i
 
-iterator pairs*(this: StackString): (int, char) {.inline.} =
+iterator pairs*(this: StackString): (int, char) =
     ## Iterates over each index-char pairs in the [StackString]
     runnableExamples:
         let str = ss"abc"
@@ -192,7 +191,7 @@ iterator pairs*(this: StackString): (int, char) {.inline.} =
         yield (i, this.data[i])
         inc i
 
-iterator mpairs*(this: var StackString): (int, var char) {.inline.} =
+iterator mpairs*(this: var StackString): (int, var char) =
     ## Iterates over each index-char pairs in the [StackString], returning a mutable reference to the char
     runnableExamples:
         var str = ss"ooo"
@@ -210,7 +209,7 @@ iterator mpairs*(this: var StackString): (int, var char) {.inline.} =
         inc i
 
 {.boundChecks: off.}
-func `[]`*(this: StackString, i: Natural | BackwardsIndex): char {.inline, raises: [IndexDefect].} =
+func `[]`*(this: StackString, i: Natural | BackwardsIndex): char {. raises: [IndexDefect].} =
     ## Returns the character at the specified index in the [StackString], or raises `IndexDefect` if the index is invalid
     runnableExamples:
         let str = ss"Hello world"
@@ -312,7 +311,7 @@ func tryGet*(this: StackString, i: Natural | BackwardsIndex): Option[char] =
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-func unsafeGet*(this: StackString, i: Natural | BackwardsIndex): char {.inline.} =
+func unsafeGet*(this: StackString, i: Natural | BackwardsIndex): char =
     ## Returns the character at the specified index in the [StackString].
     ## 
     ## Performs no bounds checks whatsoever; use only if you're 100% sure your index won't extend beyond the [StackString]'s capacity + its nil terminator.
@@ -327,7 +326,7 @@ func unsafeGet*(this: StackString, i: Natural | BackwardsIndex): char {.inline.}
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-func `[]=`*(this: var StackString, i: Natural | BackwardsIndex, value: char) {.inline, raises: [IndexDefect].} =
+func `[]=`*(this: var StackString, i: Natural | BackwardsIndex, value: char) {. raises: [IndexDefect].} =
     ## Sets the character at the specified index in the [StackString], or raises `IndexDefect` if the index is invalid
     runnableExamples:
         var str = ss"Hello world"
@@ -378,7 +377,7 @@ func trySet*(this: var StackString, i: Natural | BackwardsIndex, value: char): b
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-func unsafeSet*(this: var StackString, i: Natural | BackwardsIndex, value: char) {.inline.} =
+func unsafeSet*(this: var StackString, i: Natural | BackwardsIndex, value: char) =
     ## Sets the character at the specified index in the [StackString].
     ## 
     ## Performs no bounds checks whatsoever; use only if you're 100% sure your index won't extend beyond the [StackString]'s capacity.
@@ -394,7 +393,7 @@ func unsafeSet*(this: var StackString, i: Natural | BackwardsIndex, value: char)
 
 # Bound checks are unnecessary here because the length is checked first
 {.boundChecks: off.}
-func `==`*(this: StackString, str: IndexableChars): bool {.inline.} =
+func `==`*(this: StackString, str: IndexableChars): bool =
     ## Returns whether the [StackString]'s content is equal to the content of another set of characters
     runnableExamples:
         let str1 = ss"abc"
@@ -420,7 +419,7 @@ func `==`*(this: StackString, str: IndexableChars): bool {.inline.} =
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-proc unsafeAdd*(this: var StackString, strOrChar: auto) {.inline.} =
+proc unsafeAdd*(this: var StackString, strOrChar: auto) =
     ## Appends the value to the [StackString].
     ## No capacity checks are performed whatsoever; only use this when you are 100% sure there is enough capacity!
     runnableExamples:
@@ -443,7 +442,7 @@ proc unsafeAdd*(this: var StackString, strOrChar: auto) {.inline.} =
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-proc tryAdd*(this: var StackString, strOrChar: auto): bool {.inline.} =
+proc tryAdd*(this: var StackString, strOrChar: auto): bool =
     ## Appends the value to the [StackString].
     ## If there is enough capacity to accomodate the new value, true will be returned.
     ## If there is not enough capacity to accomodate the new value, false will be returned.
@@ -476,7 +475,7 @@ proc tryAdd*(this: var StackString, strOrChar: auto): bool {.inline.} =
 {.boundChecks: on.}
 
 {.boundChecks: off.}
-proc addTruncate*(this: var StackString, strOrChar: auto): bool {.inline, discardable.} =
+proc addTruncate*(this: var StackString, strOrChar: auto): bool {. discardable.} =
     ## Appends the provided value to the [StackString].
     ## If the capacity of the StackString is not enough to accomodate the value, the chars that cannot be appended will be truncated.
     ## If the provided value is truncated, `false` will be returned. Otherwise, `true` will be returned.
@@ -521,7 +520,7 @@ proc addTruncate*(this: var StackString, strOrChar: auto): bool {.inline, discar
         this.lenInternal = newLen
 {.boundChecks: on.}
 
-proc add*(this: var StackString, strOrChar: auto) {.inline, raises: [InsufficientCapacityDefect].} =
+proc add*(this: var StackString, strOrChar: auto) {. raises: [InsufficientCapacityDefect].} =
     ## Appends the provided value to the [StackString].
     ## If there is not enough capacity to accomodate the new value, [InsufficientCapacityDefect] will be raised.
     ## 
@@ -555,7 +554,7 @@ proc add*(this: var StackString, strOrChar: auto) {.inline, raises: [Insufficien
             )
 
 {.boundChecks: off.}
-proc unsafeSetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true) {.inline.} =
+proc unsafeSetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true) =
     ## Sets the length of the [StackString] to `newLen`.
     ## No capacity checks are performed whatsoever; only use this if you're 100% sure you are not exceeding capacity!
     ## 
@@ -577,7 +576,7 @@ proc unsafeSetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writ
     this.lenInternal = lenRes
 {.boundChecks: on.}
 
-proc trySetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true): bool {.inline.} =
+proc trySetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true): bool =
     ## Sets the length of the [StackString] to `newLen`, then returns true.
     ## If `newLen` is more than the [StackString]'s capacity, `false` will be returned.
     ## 
@@ -602,7 +601,7 @@ proc trySetLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZe
 
     return true
 
-proc setLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true) {.inline, raises: [InsufficientCapacityDefect].} =
+proc setLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZerosOnTruncate: bool = true) {. raises: [InsufficientCapacityDefect].} =
     ## Sets the length of the [StackString] to `newLen`.
     ## If `newLen` is more than the [StackString]'s capacity, [InsufficientCapacityDefect] will be raised.
     ## 
@@ -644,7 +643,7 @@ proc setLen*(this: var StackString, newLen: Natural | BackwardsIndex, writeZeros
     
     this.unsafeSetLen(newLen, writeZerosOnTruncate)
 
-func find*(this: StackString, c: char): int {.inline.} =
+func find*(this: StackString, c: char): int =
     ## Finds the index of the specified char in the [StackString], or returns `-1` if the char was not found
     runnableExamples:
         let str = ss"abcdef"
@@ -659,7 +658,7 @@ func find*(this: StackString, c: char): int {.inline.} =
     
     return -1
 
-func contains*(this: StackString, c: char): bool {.inline.} =
+func contains*(this: StackString, c: char): bool =
     ## Returns whether the specified char can be found within the [StackString]
     runnableExamples:
         let str = ss"abcdef"
@@ -670,7 +669,7 @@ func contains*(this: StackString, c: char): bool {.inline.} =
     
     return this.find(c) != -1
 
-func find*(this: StackString, substr: StackString | string | IndexableChars): int {.inline.} =
+func find*(this: StackString, substr: StackString | string | IndexableChars): int =
     ## Finds the index of the specified substring in the [StackString], or returns `-1` if the substring was not found
     runnableExamples:
         let str = ss"abcdef"
@@ -696,7 +695,7 @@ func find*(this: StackString, substr: StackString | string | IndexableChars): in
     # Didn't already return index, so no match was found
     return -1
 
-func contains*(this: StackString, substr: StackString | string | IndexableChars): bool {.inline.} =
+func contains*(this: StackString, substr: StackString | string | IndexableChars): bool =
     ## Returns whether the specified substring can be found within the [StackString]
     runnableExamples:
         let str = ss"abcdef"
@@ -736,7 +735,7 @@ template toCstring*(this: StackString): cstring =
     else:
         cast[cstring](unsafeaddr this.data[0])
 
-proc toHeapCstring*(this: StackString): cstring {.inline.} =
+proc toHeapCstring*(this: StackString): cstring =
     ## Allocates a `cstring` on the heap and copies the contents of the [StackString] into it.
     ## The `cstring` is a pointer to heap memory which must be freed manually by the caller using `dealloc`.
     ## If you just want to get the [StackString]'s `data` stack pointer as a `cstring`, use `toCstring` instead.
@@ -766,7 +765,7 @@ proc toHeapCstring*(this: StackString): cstring {.inline.} =
         moveMem(result, unsafeaddr this.data[0], len)
     result[len] = '\x00'
 
-proc unsafeToStackString*(content: IndexableChars, size: static Natural): StackString[size] {.inline.} =
+proc unsafeToStackString*(content: IndexableChars, size: static Natural): StackString[size] =
     ## Creates a new [StackString] of the specified size using the provided content.
     ## No capacity checks are performed whatsoever; only use this when you are 100% sure that the content's length is less than or equal to the specified size!
     runnableExamples:
@@ -786,7 +785,7 @@ proc unsafeToStackString*(content: IndexableChars, size: static Natural): StackS
     result = stackStringOfCap(size)
     result.unsafeAdd(content)
 
-proc toStackString*(content: IndexableChars, size: static Natural): StackString[size] {.inline.} =
+proc toStackString*(content: IndexableChars, size: static Natural): StackString[size] =
     ## Creates a new [StackString] of the specified size using the provided content.
     ## If you don't want to raise a defect when the input string exceeds the specified size, use [tryToStackString].
     ## If you want to truncate the content in the resulting [StackString] if it's too long, use [toStackStringTruncate].
@@ -812,7 +811,7 @@ proc toStackString*(content: IndexableChars, size: static Natural): StackString[
 
     return content.unsafeToStackString(size)
 
-proc tryToStackString*(content: IndexableChars, size: static Natural): Option[StackString[size]] {.inline.} =
+proc tryToStackString*(content: IndexableChars, size: static Natural): Option[StackString[size]] =
     ## Creates a new [StackString] of the specified size using the provided content.
     ## If the content's length is more than the `size` argument, then None will be returned.
     ## If you want to raise a defect when the input string exceeds the specified size, use [toStackString].
@@ -834,7 +833,7 @@ proc tryToStackString*(content: IndexableChars, size: static Natural): Option[St
 
     return some content.unsafeToStackString(size)
 
-proc toStackStringTruncate*(content: IndexableChars, size: static Natural): StackString[size] {.inline.} =
+proc toStackStringTruncate*(content: IndexableChars, size: static Natural): StackString[size] =
     ## Creates a new [StackString] of the specified size using the provided content.
     ## If the content length is more than `size`, only the part of the content that can fit in the size will be included, and the rest will be truncated.
     runnableExamples:
