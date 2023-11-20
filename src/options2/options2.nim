@@ -1,4 +1,4 @@
-## extended/customized std/option adapted from rust
+## extended/customized std/option adapted from rust (mostly)
 ## 
 
 {.push raises: [], inline.}
@@ -11,6 +11,8 @@ import ../typedefs
 #####// Generic Combinators //#####
 #####/////////////////////////#####
 
+# NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾
+
 proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
   case self.isSome
@@ -18,14 +20,16 @@ proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf
   of false: none(U)
 
 proc map_or*[T, U](self: sink Option[T], default: U, cb: Callable[T, U]): U {.effectsOf: cb.} =
+  ## Returns the provided default result (if none), or applies a function to the contained value (if any).
   case self.isSome
   of true:  cb(self.unsafeGet)
   of false: default
 
-proc map_or_else*[T, U](self: sink Option[T], default: U, cb: Callable[T, U]): U {.effectsOf: cb.} =
+proc map_or_else*[T, U](self: sink Option[T], default: Callable[void, U], cb: Callable[T, U]): U {.effectsOf: cb.} =
+  ## Computes a default function result (if none), or applies a different function to the contained value (if any).
   case self.isSome
   of true:  cb(self.unsafeGet)
-  of false: default
+  of false: default()
 
 proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effectsOf: cb.} =
   ## Returns None if the option is None, otherwise calls predicate with the wrapped value and returns:
@@ -35,7 +39,6 @@ proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effect
     result = none(T)
   else:
     result = self
-
 
 proc flatten*[T](self: Option[Option[T]]): Option[T] =
   case self.isSome
@@ -78,7 +81,7 @@ proc or_else[T](self: sink Option[T], cb: Callable[void, Option[T]]): Option[T] 
   ## Returns `self` if it contains a value, otherwise calls `cb` and returns it's result.
   case self.isSome
   of true:  self
-  of false: cb
+  of false: cb()
 
 proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
   ## Returns some(T) if exactly one of `self` and `opt` isSome() is true, otherwise returns none(T).
@@ -91,7 +94,7 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 
 
 #####/////////////////////////#####
-#####//  dot-like chaining  //#####
+#####//  dot-like chaining  //##### // might need to patch that, i mean wdf
 #####/////////////////////////#####
 
 converter toBool*(option: ExistentialOption[bool]): bool =
