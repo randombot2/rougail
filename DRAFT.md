@@ -11,6 +11,10 @@ features:
 - function calls that can throw can be tagged using `|>` or `!>`
 - tagged exceptions are pre-allocated
 - uses quirky exceptions (a certain core developer will be very happy)
+- std/json API-compatible, `simdjson` based json de/serialiasation with the possibility to turn the json parser into a `JsonNode` when needed.
+- Composable, zero-cost iterators and lambdas that are inlined and can be turned into closures at will that can express powerful FP idioms.
+- Preallocated, tagged exceptions that has all the advantages of `Result` and convenience of `try/except` at minimal cost.
+- CPS based `async/await` and `Future[T]` based on `io_uring` and `nim-sys`.
 
 rationale:
 - usability :: tagged exceptions enhance Nim's error handling story by allow users to "fine-tune" their raises by checking which proc threw an exception while keeping it

@@ -185,7 +185,9 @@ proc take*[T](self: sink Option[T]): Option[T] =
   ## is a no-op if `self` is already `None`
   replace(result, none(T))
 
-proc take_if*[T](self: sink Option[T], pred: Callable[var T, bool]): Option[T] = discard "can see this being useful, will implement"
+proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
+  case self.isSome
+
   
   
   

@@ -1,6 +1,6 @@
 import std/macros
 import std/[sugar, with] 
-
+export with, `->`
 
 template dup*[T](val: sink T, calls: varargs[untyped]): T =
     ## Turns an `in-place`:idx: algorithm into one that works on
