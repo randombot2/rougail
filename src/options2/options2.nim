@@ -3,13 +3,75 @@
 
 {.push raises: [], inline.}
 
-from std/options import Option, UnpackDefect, isSome, isNone, some, none, get, unsafeGet
+#from std/options import Option, UnpackDefect, isSome, isNone, some, none, get, unsafeGet
 import macros, std/genasts
 import ../typedefs
 
 #####/////////////////////////#####
+#####/////// typedefs ////////#####
+#####/////////////////////////#####
+
+type
+    ResultDefect* = object of Defect
+  
+    ResultError*[E] = object of ValueError
+      err*: E
+  
+    Result*[T, E] = object  
+      case has: bool
+      of false:
+        when E is not void: 
+          err: E
+        else: discard
+      of true:
+        when T is not void: 
+          val: T
+        else: discard
+
+    Option*[T] = Result[T, void] # Custom Optional type: it's just a `Result` alias. can be converted to the "real" Option
+
+
+#####/////////////////////////#####
+#####////// whatever /////////#####
+#####/////////////////////////#####
+
+# result api
+template ok*[T: not void, E](R: type Result[T, E], x: T): R =
+  ## Initialize a result with a success and value
+  ## Example: `Result[int, string].ok(42)`
+  R(has: true, val: x)
+
+template ok*[E](R: type Result[void, E]): R =
+  ## Initialize a result with a success and value
+  ## Example: `Result[void, string].ok()`
+  R(has: true)
+
+template ok*[T: not void, E](self: var Result[T, E], x: untyped) =
+  ## Set the result to success and update value
+  ## Example: `result.ok(42)`
+  self = ok(type self, x)
+
+template ok*[E](self: var Result[void, E]) =
+  ## Set the result to success and update value
+  ## Example: `result.ok()`
+  self = (type self).ok()
+
+# option api
+proc isSome*[T, E](r: Result[T, E]): bool {.inline.} = r.has
+proc isNone*[T, E](r: Result[T, E]): bool {.inline.} = r.has.not
+
+
+#####/////////////////////////#####
 #####// Generic Combinators //#####
 #####/////////////////////////#####
+
+proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
+  when T is SomePointer:
+    a.val == b.val 
+  else:
+    (a.isSome and b.isSome and a.val == b.val) or (a.isNone and b.isNone)
+
+
 
 # NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾 (procs desc are copypasted from rust's so i should modify them in the future)
 
