@@ -31,10 +31,10 @@ type
 
 
 #####/////////////////////////#####
-#####////// whatever /////////#####
+#####// option/result impl ///#####
 #####/////////////////////////#####
 
-# result api
+####### result api ########
 template ok*[T: not void, E](R: type Result[T, E], x: T): R =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
@@ -45,7 +45,7 @@ template ok*[E](R: type Result[void, E]): R =
   ## Example: `Result[void, string].ok()`
   R(has: true)
 
-template ok*[T: not void, E](self: var Result[T, E], x: untyped) =
+template ok*[T: not void, E](self: var Result[T, E], x: typed) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = ok(type self, x)
@@ -55,21 +55,27 @@ template ok*[E](self: var Result[void, E]) =
   ## Example: `result.ok()`
   self = (type self).ok()
 
-template err*[T; E: not void](R: type Result[T, E], x: untyped): R =
+template ok*(v: auto): auto = 
+  ok(typeof(result), v)
+
+template ok*(): auto = 
+  ok(typeof(result))
+
+template err*[T; E: not void](R: type Result[T, E], x: typed): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(oResultPrivate: false, eResultPrivate: x)
+  R(has: false, err: x)
 
 template err*[T](R: type Result[T, cstring], x: string): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   const s = x # avoid dangling cstring pointers
-  R(oResultPrivate: false, eResultPrivate: cstring(s))
+  R(has: false, err: cstring(s))
 
 template err*[T](R: type Result[T, void]): R =
   ## Initialize the result to an error
   ## Example: `Result[int, void].err()`
-  R(oResultPrivate: false)
+  R(has: false)
 
 template err*[T; E: not void](self: var Result[T, E], x: untyped) =
   ## Set the result as an error
@@ -85,11 +91,11 @@ template err*[T](self: var Result[T, void]) =
   ## Example: `result.err()`
   self = err(type self)
 
-template ok*(v: auto): auto = ok(typeof(result), v)
-template ok*(): auto = ok(typeof(result))
+template err*(v: auto): auto = 
+  err(typeof(result), v)
 
-template err*(v: auto): auto = err(typeof(result), v)
-template err*(): auto = err(typeof(result))
+template err*(): auto = 
+  err(typeof(result))
 
 func value*[T, E](self: Result[T, E]): lent T {.inline.} =
   ## Fetch value of result if set, or raise Defect
@@ -113,20 +119,24 @@ proc value*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
   of false:
     raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value") 
 
+template isOk*(self: Result): bool = 
+  self.has
 
-# option api
-proc isSome*[T, E](r: Result[T, E]): bool {.inline.} = r.has
-proc isNone*[T, E](r: Result[T, E]): bool {.inline.} = r.has.not
+template isErr*(self: Result): bool = 
+  self.has.not
+
+
+
+####### option api ########
+proc isSome*[T](self: Option[T]): bool {.inline.} = self.isOk
+proc isNone*[T](self: Option[T]): bool {.inline.} = self.isErr
 
 proc some*[T](val: sink T): Option[T] {.inline.} =
   ## Returns an `Option` that has the value `val`.
   Option[T](has: true, val: val)
 
-  
 proc none*(T: typedesc): Option[T] {.inline.} =
   ## Returns an `Option` for this type that has no value.
-
-  # the default is the none type
   discard
 
 proc none*[T]: Option[T] {.inline.} =
@@ -138,16 +148,16 @@ template get*[T, E](self: Result[T, E]): lent T =
   self.value
 
 
-#####/////////////////////////#####
-#####// Generic Combinators //#####
-#####/////////////////////////#####
-
 proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
   when T is SomePointer:
     a.val == b.val 
   else:
     (a.isSome and b.isSome and a.val == b.val) or (a.isNone and b.isNone)
 
+
+#####/////////////////////////#####
+#####// Generic Combinators //#####
+#####/////////////////////////#####
 
 
 # NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾 (procs desc are copypasted from rust's so i should modify them in the future)
@@ -324,8 +334,8 @@ proc take*[T](self: sink Option[T]): Option[T] =
   ## is a no-op if `self` is already `None`
   replace(result, none(T))
 
-proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
-  case self.isSome
+# proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
+#   case self.isSome
 
   
   
@@ -337,4 +347,4 @@ proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
 #####//    sanity checks    //#####
 #####/////////////////////////#####
 when isMainModule:
-  echo some("stuff").take.expect("works")
+  echo some("stuff").expect("works")
