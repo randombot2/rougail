@@ -147,7 +147,6 @@ template get*[T, E](self: Result[T, E]): lent T =
   mixin value
   self.value
 
-
 proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
   when T is SomePointer:
     a.val == b.val 
@@ -160,21 +159,19 @@ proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
 #####/////////////////////////#####
 
 
-# NOTE: I have never seen docs as unintuitive as rust's, the examples barely saves it 👎🏾 (procs desc are copypasted from rust's so i should modify them in the future)
-
-proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
+proc map*[T, E, R](self: sink Result[T, E], cb: Callable[T, R]): Result[R, E] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
   case self.isSome
-  of true:  some[U](cb(self.get))
-  of false: none(U)
+  of true:  result.ok(cb(self.get))
+  of false: none(R)
 
-proc map_or*[T, U](self: sink Option[T], default: U, cb: Callable[T, U]): U {.effectsOf: cb.} =
+proc map_or*[T, R](self: sink Option[T], default: R, cb: Callable[T, R]): R {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
   case self.isSome
   of true:  cb(self.get)
   of false: default
 
-proc map_or_else*[T, U](self: sink Option[T], default: Callable[void, U], cb: Callable[T, U]): U {.effectsOf: cb.} =
+proc map_or_else*[T, R](self: sink Option[T], default: Callable[void, R], cb: Callable[T, R]): R {.effectsOf: cb.} =
   ## Computes a default function result (if none), or applies a different function to the contained value (if any).
   case self.isSome
   of true:  cb(self.get)
@@ -194,16 +191,16 @@ proc flatten*[T](self: Option[Option[T]]): Option[T] =
   of true:  self.get
   of false: none(T)
 
-proc zip*[T; U](self: sink Option[T], opt: sink Option[U]): Option[(T, U)] =
+proc zip*[T; R](self: sink Option[T], opt: sink Option[R]): Option[(T, R)] =
   case (self.isSome, opt.isSome)
   of (true, true): some (self.get, opt.unsafGet)
-  else: none (T, U)
+  else: none (T, R)
 
-proc unzip*[T; U](self: sink Option[(T, U)]): (Option[T], Option[U]) =
+proc unzip*[T; R](self: sink Option[(T, R)]): (Option[T], Option[R]) =
   if self.isSome:
     (self.get[0], self.get[1])
   else:
-    (none(T), none(U))
+    (none(T), none(R))
 
 #####//////////////////////////////////////////////////////#####
 #####// Boolean operations on the values, eager and lazy //#####
@@ -215,9 +212,9 @@ proc `and`*[T](self, opt: sink Option[T]): Option[T] =
     of true:  opt
     of false: none T
 
-proc and_then*[T, U](self: sink Option[T], cb: Callable[T, Option[U]]): Option[U] {.effectsOf: cb.} =
+proc and_then*[T, R](self: sink Option[T], cb: Callable[T, Option[R]]): Option[R] {.effectsOf: cb.} =
   ## A renamed version of the std/option's `flatMap` where `self` and the argument of `cb` can be consumed.
-  ## If the `Option` has no value, `none(U)` will be returned.
+  ## If the `Option` has no value, `none(R)` will be returned.
   flatten self.map(cb)
 
 proc `or`*[T](self, opt: sink Option[T]): Option[T] =
