@@ -12,7 +12,7 @@ import ../typedefs
 #####/////////////////////////#####
 
 type
-    ResultDefect* = object of Defect
+    UnpackDefect* = object of Defect
   
     ResultError*[E] = object of ValueError
       err*: E
@@ -56,10 +56,86 @@ template ok*[E](self: var Result[void, E]) =
   ## Example: `result.ok()`
   self = (type self).ok()
 
+template err*[T; E: not void](R: type Result[T, E], x: untyped): R =
+  ## Initialize the result to an error
+  ## Example: `Result[int, string].err("uh-oh")`
+  R(oResultPrivate: false, eResultPrivate: x)
+
+template err*[T](R: type Result[T, cstring], x: string): R =
+  ## Initialize the result to an error
+  ## Example: `Result[int, string].err("uh-oh")`
+  const s = x # avoid dangling cstring pointers
+  R(oResultPrivate: false, eResultPrivate: cstring(s))
+
+template err*[T](R: type Result[T, void]): R =
+  ## Initialize the result to an error
+  ## Example: `Result[int, void].err()`
+  R(oResultPrivate: false)
+
+template err*[T; E: not void](self: var Result[T, E], x: untyped) =
+  ## Set the result as an error
+  ## Example: `result.err("uh-oh")`
+  self = err(type self, x)
+
+template err*[T](self: var Result[T, cstring], x: string) =
+  const s = x # Make sure we don't return a dangling pointer
+  self = err(type self, cstring(s))
+
+template err*[T](self: var Result[T, void]) =
+  ## Set the result as an error
+  ## Example: `result.err()`
+  self = err(type self)
+
+template ok*(v: auto): auto = ok(typeof(result), v)
+template ok*(): auto = ok(typeof(result))
+
+template err*(v: auto): auto = err(typeof(result), v)
+template err*(): auto = err(typeof(result))
+
+func value*[T, E](self: Result[T, E]): T {.inline.} =
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
+  ## See also: Option.get
+  case self.has
+  of true:
+    when T isnot void:
+      self.val
+    else: discard
+  of false:
+    raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value")
+
+proc value*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
+  ## See also: Option.get
+  case self.has
+  of true:
+      result = (addr self.val)[]
+  of false:
+    raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value") 
+
+template get*[T, E](self: Result[T, E]): T =
+  mixin value
+  self.value
+
 # option api
 proc isSome*[T, E](r: Result[T, E]): bool {.inline.} = r.has
 proc isNone*[T, E](r: Result[T, E]): bool {.inline.} = r.has.not
 
+proc some*[T](val: sink T): Option[T] {.inline.} =
+  ## Returns an `Option` that has the value `val`.
+  Option[T](has: true, val: val)
+
+  
+proc none*(T: typedesc): Option[T] {.inline.} =
+  ## Returns an `Option` for this type that has no value.
+
+  # the default is the none type
+  discard
+
+proc none*[T]: Option[T] {.inline.} =
+  ## Alias for `none(T) <#none,typedesc>`_.
+  none(T)
 
 #####/////////////////////////#####
 #####// Generic Combinators //#####
@@ -159,51 +235,51 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #####//  dot-like chaining  //##### // might need to patch that, i mean wdf
 #####/////////////////////////#####
 
-converter toBool*(option: ExistentialOption[bool]): bool =
-  Option[bool](option).isSome and Option[bool](option).unsafeGet
-
-converter toOption*[T](option: ExistentialOption[T]): Option[T] =
-  Option[T](option)
-
-proc toExistentialOption*[T](option: Option[T]): ExistentialOption[T] =
-  ExistentialOption[T](option)
-
-proc toOpt*[T](value: sink Option[T]): Option[T] =
-  ## Procedure with overload to automatically convert something to an option if
-  ## it's not already an option.
-  value
-
-proc toOpt*[T](value: sink T): Option[T] =
-  ## Procedure with overload to automatically convert something to an option if
-  ## it's not already an option.
-  some(value)
-
-macro `?.`*[T](option: Option[T], statements: untyped): untyped =
-  let opt = genSym(nskLet)
-  var
-    injected = statements
-    firstBarren = statements
-  if firstBarren.kind in {nnkCall, nnkDotExpr, nnkCommand}:
-    # This edits the tree that injected points to
-    while true:
-      if firstBarren[0].kind notin {nnkCall, nnkDotExpr, nnkCommand}:
-        firstBarren[0] = nnkDotExpr.newTree(
-          newCall(bindSym("unsafeGet"), opt), firstBarren[0])
-        break
-      firstBarren = firstBarren[0]
-  else:
-    injected = nnkDotExpr.newTree(
-      newCall(bindSym("unsafeGet"), opt), firstBarren)
-
-  result = quote do:
-    (proc (): auto  =
-      let `opt` = `option`
-      if `opt`.isSome:
-        when compiles(`injected`) and not compiles(some(`injected`)):
-          `injected`
-        else:
-          return toExistentialOption(toOpt(`injected`))
-    )()
+# converter toBool*(option: ExistentialOption[bool]): bool =
+#   Option[bool](option).isSome and Option[bool](option).unsafeGet
+# 
+# converter toOption*[T](option: ExistentialOption[T]): Option[T] =
+#   Option[T](option)
+# 
+# proc toExistentialOption*[T](option: Option[T]): ExistentialOption[T] =
+#   ExistentialOption[T](option)
+# 
+# proc toOpt*[T](value: sink Option[T]): Option[T] =
+#   ## Procedure with overload to automatically convert something to an option if
+#   ## it's not already an option.
+#   value
+# 
+# proc toOpt*[T](value: sink T): Option[T] =
+#   ## Procedure with overload to automatically convert something to an option if
+#   ## it's not already an option.
+#   some(value)
+# 
+# macro `?.`*[T](option: Option[T], statements: untyped): untyped =
+#   let opt = genSym(nskLet)
+#   var
+#     injected = statements
+#     firstBarren = statements
+#   if firstBarren.kind in {nnkCall, nnkDotExpr, nnkCommand}:
+#     # This edits the tree that injected points to
+#     while true:
+#       if firstBarren[0].kind notin {nnkCall, nnkDotExpr, nnkCommand}:
+#         firstBarren[0] = nnkDotExpr.newTree(
+#           newCall(bindSym("unsafeGet"), opt), firstBarren[0])
+#         break
+#       firstBarren = firstBarren[0]
+#   else:
+#     injected = nnkDotExpr.newTree(
+#       newCall(bindSym("unsafeGet"), opt), firstBarren)
+# 
+#   result = quote do:
+#     (proc (): auto  =
+#       let `opt` = `option`
+#       if `opt`.isSome:
+#         when compiles(`injected`) and not compiles(some(`injected`)):
+#           `injected`
+#         else:
+#           return toExistentialOption(toOpt(`injected`))
+#     )()
     
 
 #####/////////////////////////#####
@@ -238,7 +314,7 @@ proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discar
   ## - If the value is a none(T) this function panics with a message.
   ## - `expect` should be used to describe the reason you expect the Option should be Some.
   if self.isSome:
-    result = self.unsafeGet
+    self.get
   else:
     raise (ref UnpackDefect)(msg: m)
 
@@ -260,4 +336,4 @@ proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
 #####//    sanity checks    //#####
 #####/////////////////////////#####
 when isMainModule:
-  some("stuff").take.expect("works")
+  echo some("stuff").take.expect("works")
