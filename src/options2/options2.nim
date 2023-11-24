@@ -3,7 +3,6 @@
 
 {.push raises: [], inline.}
 
-#from std/options import Option, UnpackDefect, isSome, isNone, some, none, get, unsafeGet
 import macros, std/genasts
 import ../typedefs
 
@@ -92,7 +91,7 @@ template ok*(): auto = ok(typeof(result))
 template err*(v: auto): auto = err(typeof(result), v)
 template err*(): auto = err(typeof(result))
 
-func value*[T, E](self: Result[T, E]): T {.inline.} =
+func value*[T, E](self: Result[T, E]): lent T {.inline.} =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
@@ -114,9 +113,6 @@ proc value*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
   of false:
     raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value") 
 
-template get*[T, E](self: Result[T, E]): T =
-  mixin value
-  self.value
 
 # option api
 proc isSome*[T, E](r: Result[T, E]): bool {.inline.} = r.has
@@ -137,6 +133,11 @@ proc none*[T]: Option[T] {.inline.} =
   ## Alias for `none(T) <#none,typedesc>`_.
   none(T)
 
+template get*[T, E](self: Result[T, E]): lent T =
+  mixin value
+  self.value
+
+
 #####/////////////////////////#####
 #####// Generic Combinators //#####
 #####/////////////////////////#####
@@ -154,19 +155,19 @@ proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
 proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
   case self.isSome
-  of true:  some[U](cb(self.unsafeGet))
+  of true:  some[U](cb(self.get))
   of false: none(U)
 
 proc map_or*[T, U](self: sink Option[T], default: U, cb: Callable[T, U]): U {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
   case self.isSome
-  of true:  cb(self.unsafeGet)
+  of true:  cb(self.get)
   of false: default
 
 proc map_or_else*[T, U](self: sink Option[T], default: Callable[void, U], cb: Callable[T, U]): U {.effectsOf: cb.} =
   ## Computes a default function result (if none), or applies a different function to the contained value (if any).
   case self.isSome
-  of true:  cb(self.unsafeGet)
+  of true:  cb(self.get)
   of false: default()
 
 proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effectsOf: cb.} =
@@ -180,17 +181,17 @@ proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effect
 
 proc flatten*[T](self: Option[Option[T]]): Option[T] =
   case self.isSome
-  of true:  self.unsafeGet
+  of true:  self.get
   of false: none(T)
 
 proc zip*[T; U](self: sink Option[T], opt: sink Option[U]): Option[(T, U)] =
   case (self.isSome, opt.isSome)
-  of (true, true): some (self.unsafeGet, opt.unsafGet)
+  of (true, true): some (self.get, opt.unsafGet)
   else: none (T, U)
 
 proc unzip*[T; U](self: sink Option[(T, U)]): (Option[T], Option[U]) =
   if self.isSome:
-    (self.unsafeGet[0], self.unsafeGet[1])
+    (self.get[0], self.get[1])
   else:
     (none(T), none(U))
 
@@ -236,7 +237,7 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #####/////////////////////////#####
 
 # converter toBool*(option: ExistentialOption[bool]): bool =
-#   Option[bool](option).isSome and Option[bool](option).unsafeGet
+#   Option[bool](option).isSome and Option[bool](option).get
 # 
 # converter toOption*[T](option: ExistentialOption[T]): Option[T] =
 #   Option[T](option)
@@ -264,12 +265,12 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #     while true:
 #       if firstBarren[0].kind notin {nnkCall, nnkDotExpr, nnkCommand}:
 #         firstBarren[0] = nnkDotExpr.newTree(
-#           newCall(bindSym("unsafeGet"), opt), firstBarren[0])
+#           newCall(bindSym("get"), opt), firstBarren[0])
 #         break
 #       firstBarren = firstBarren[0]
 #   else:
 #     injected = nnkDotExpr.newTree(
-#       newCall(bindSym("unsafeGet"), opt), firstBarren)
+#       newCall(bindSym("get"), opt), firstBarren)
 # 
 #   result = quote do:
 #     (proc (): auto  =
@@ -292,7 +293,7 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 proc `|?`*[T](option: sink Option[T], fallback: sink T): T  =
   ## Use the `|?` operator to supply a fallback value when an Option does not hold a value.
   if option.isSome:
-    option.unsafeGet()
+    option.get()
   else:
     fallback
 
