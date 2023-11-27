@@ -5,7 +5,6 @@
 
 import macros, std/genasts
 import ../typedefs
-from std/options import Option, isSome, isNone, get, none, some
 
 
 # ----- Internal Helpers ----- #
@@ -130,7 +129,6 @@ proc expect*[T: not void, E](self: Result[T, E], m: string): lent T {.raises:[Un
 
 # ----- Generic Combinators ----- #
 
-
 proc map*[T, R, E](
     self: sink Result[T, E]; 
     fn: Callable[T, R]
@@ -201,19 +199,23 @@ proc or_else[T, E](
   of false: cb(self.err)
 
 
+
+
 #####/////////////////////////#####
 #####////// Option API ///////#####
 #####/////////////////////////#####
+from std/options import Option, isSome, isNone, get, none, some, `==`, `$`
+export Option, isSome, isNone, get, none, some, `==`, `$`
+import std/importutils; privateAccess(Option)
 
 
 
 # ----- Generic Combinators and other FP utilities ----- #
 
-
 proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
   case self.isSome
-  of true:  some[U](cb(self.unsafeGet))
+  of true:  some[U](cb(self.val))
   of false: none(U)
 
 proc map_or*[T, R](self: sink Option[T],
@@ -222,7 +224,7 @@ proc map_or*[T, R](self: sink Option[T],
   ): R {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
   case self.isSome
-  of true:  cb(self.get)
+  of true:  cb(self.val)
   of false: default
 
 proc map_or_else*[T, R](self: sink Option[T];
@@ -231,7 +233,7 @@ proc map_or_else*[T, R](self: sink Option[T];
   ): R {.effectsOf: cb.} =
   ## Computes a default function result (if none), or applies a different function to the contained value (if any).
   case self.isSome
-  of true:  cb(self.get)
+  of true:  cb(self.val)
   of false: default()
 
 proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effectsOf: cb.} =
@@ -245,18 +247,18 @@ proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effect
 
 proc flatten*[T](self: Option[Option[T]]): Option[T] =
   case self.isSome
-  of true:  self.get
+  of true:  self.val
   of false: none(T)
 
 proc zip*[T; R](self: sink Option[T], opt: sink Option[R]): Option[(T, R)] =
   if self.isSome and opt.isSome:
-    some (self.get, opt.get)
+    some (self.val, opt.val)
   else: 
     none (T, R)
 
 proc unzip*[T; R](self: sink Option[(T, R)]): (Option[T], Option[R]) =
   if self.isSome:
-    (self.get[0], self.get[1])
+    (self.val[0], self.val[1])
   else:
     (none(T), none(R))
 
@@ -298,7 +300,7 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #####/////////////////////////#####
 
 # converter toBool*(option: ExistentialOption[bool]): bool =
-#   Option[bool](option).isSome and Option[bool](option).get
+#   Option[bool](option).isSome and Option[bool](option).val
 # 
 # converter toOption*[T](option: ExistentialOption[T]): Option[T] =
 #   Option[T](option)
@@ -326,12 +328,12 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #     while true:
 #       if firstBarren[0].kind notin {nnkCall, nnkDotExpr, nnkCommand}:
 #         firstBarren[0] = nnkDotExpr.newTree(
-#           newCall(bindSym("get"), opt), firstBarren[0])
+#           newCall(bindSym("val"), opt), firstBarren[0])
 #         break
 #       firstBarren = firstBarren[0]
 #   else:
 #     injected = nnkDotExpr.newTree(
-#       newCall(bindSym("get"), opt), firstBarren)
+#       newCall(bindSym("val"), opt), firstBarren)
 # 
 #   result = quote do:
 #     (proc (): auto  =
@@ -355,7 +357,7 @@ proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discar
   ## - If the value is a none(T) this function panics with a message.
   ## - `expect` should be used to describe the reason you expect the Option should be Some.
   if self.isSome:
-    self.get
+    self.val
   else:
     raise (ref UnpackDefect)(msg: m)
 
