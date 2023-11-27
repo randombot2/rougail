@@ -102,13 +102,13 @@ proc unsafeGet*[T, E](self: var Result[T, E]): var T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
   assert isOk(self)
-  result = self.v
+  result = self.val
 
 proc unsafeGet*[T, E](self: Result[T, E]): lent T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
   assert isOk(self)
-  result = self.v
+  result = self.val
 
 proc val*[T: not void, E](self: Result[T, E]): lent T =
   ## Fetch value of result if set, or raise Defect
@@ -149,13 +149,22 @@ proc map*[T, R, E](
       result.err self.err
 
 proc map_or*[T, R: not void, E](
-    self: sink Result[T, E], 
-    fn: Callable[T, R],
+    self: sink Result[T, E]; 
+    fn: Callable[T, R];
     default: R
   ): R {.effectsOf: fn.} =
   case self.isOk
-  of true:  fn(self.get)
+  of true:  fn(self.val)
   of false: default
+
+proc map_or_else*[T, R, E](
+    self: sink Result[T, E];
+    fn: Callable[T, R];
+    default: Callable[void, R]
+  ): R {.effectsOf: fn.} =
+  case self.isOk
+  of true:  fn(self.val)
+  of false: default()
 
 proc `and`*[T, E: not void](self, res: sink Result[T, E]): Result[T, E] =
   case self.isOk
@@ -207,13 +216,19 @@ proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf
   of true:  some[U](cb(self.unsafeGet))
   of false: none(U)
 
-proc map_or*[T, R](self: sink Option[T], default: R, cb: Callable[T, R]): R {.effectsOf: cb.} =
+proc map_or*[T, R](self: sink Option[T],
+    cb: Callable[T, R];
+    default: R
+  ): R {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
   case self.isSome
   of true:  cb(self.get)
   of false: default
 
-proc map_or_else*[T, R](self: sink Option[T], default: Callable[void, R], cb: Callable[T, R]): R {.effectsOf: cb.} =
+proc map_or_else*[T, R](self: sink Option[T];
+    cb: Callable[T, R];
+    default: Callable[void, R]
+  ): R {.effectsOf: cb.} =
   ## Computes a default function result (if none), or applies a different function to the contained value (if any).
   case self.isSome
   of true:  cb(self.get)
