@@ -1,8 +1,8 @@
 # options2 
 
-Reimplementation of `std/options` and `nim-results` with rust-like combinators, `questionable` operators, and more in a single module.
+Reimplementation of `std/options` and `nim-results` with rust-like combinators and `sink` optimizations, etc in a single module.
 
 ## new features:
 - `Result[T, E]`
-- combinators
-- operators
+- combinators for options and results
+

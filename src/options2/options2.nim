@@ -1,4 +1,4 @@
-## extended/customized std/option adapted from rust (mostly)
+## extended/customized std/option and nim-result adapted from rust (mostly) with sink optimizations.
 ## 
 
 {.push raises: [], inline.}
