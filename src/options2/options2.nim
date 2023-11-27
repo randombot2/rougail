@@ -294,6 +294,24 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
   else:
     result = none(T)
 
+proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discardable.} =
+  ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
+  ## - If the value is a none(T) this function panics with a message.
+  ## - `expect` should be used to describe the reason you expect the Option should be Some.
+  if self.isSome:
+    self.val
+  else:
+    raise (ref UnpackDefect)(msg: m)
+
+proc take*[T](self: sink Option[T]): Option[T] =
+  ## Takes the value out of the option, leaving a None in its place.
+  ## is a no-op if `self` is already `None`
+  replace(result, none(T))
+
+proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
+  case self.isSome and pred(self.val)
+  of true:  take(self)
+  of false: self
 
 #####/////////////////////////#####
 #####//  dot-like chaining  //##### // might need to patch that, i mean wdf
@@ -345,33 +363,6 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #           return toExistentialOption(toOpt(`injected`))
 #     )()
     
-
-
-#####/////////////////////////#####
-#####//         etc         //#####
-#####/////////////////////////#####
-
-  
-proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discardable.} =
-  ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
-  ## - If the value is a none(T) this function panics with a message.
-  ## - `expect` should be used to describe the reason you expect the Option should be Some.
-  if self.isSome:
-    self.val
-  else:
-    raise (ref UnpackDefect)(msg: m)
-
-proc take*[T](self: sink Option[T]): Option[T] =
-  ## Takes the value out of the option, leaving a None in its place.
-  ## is a no-op if `self` is already `None`
-  replace(result, none(T))
-
-# proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
-#   case self.isSome
-
-  
-  
-  
   
 
 
