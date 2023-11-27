@@ -4,6 +4,5 @@ Reimplementation of `std/options` and `nim-results` with rust-like combinators, 
 
 ## new features:
 - `Result[T, E]`
-- `Option[T]`
 - combinators
 - operators

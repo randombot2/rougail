@@ -5,165 +5,207 @@
 
 import macros, std/genasts
 import ../typedefs
+from std/options import Option, isSome, isNone, get, none, some
+
+
+# ----- Internal Helpers ----- #
+
+
+proc fatalResult*(m: string) {.noreturn, noinline.} =
+  raise (ref UnpackDefect)(msg: m)
+
+template assertOk*(self: Result) =
+  if not self.isOk:
+    when self.E isnot void:
+      raiseResultDefect("Trying to access value with err Result", self.err)
+    else:
+      raiseResultDefect("Trying to access value with err Result")
+
+proc replace[T](dest: var T, src: sink T): T =
+  ## like `swap` but returns the swapped value 
+  # TODO: should go in some other module
+  swap(dest, src)
+  result = dest
+
+
 
 #####/////////////////////////#####
-#####/////// typedefs ////////#####
+#####////// Result API //////#####
 #####/////////////////////////#####
 
-type
-    UnpackDefect* = object of Defect
+
+# ----- Basic API ----- #
+
+
+proc isOk*(self: Result): bool = 
+  self.has
   
-    ResultError*[E] = object of ValueError
-      err*: E
-  
-    Result*[T, E] = object  
-      case has: bool
-      of false:
-        when E is not void: 
-          err: E
-        else: discard
-      of true:
-        when T is not void: 
-          val: T
-        else: discard
+proc isErr*(self: Result): bool = 
+  not self.has
 
-    Option*[T] = Result[T, void] # Custom Optional type: it's just a `Result` alias. can be converted to the "real" Option
+proc `$`*[T: not void; E](self: Result[T, E]): string =
+  ## Returns string representation of `self`
+  if self.isOk: "Ok(" & $self.val & ")"
+  else: "Err(" & $self.err & ")"
 
+proc `$`*[E](self: Result[void, E]): string =
+  ## Returns string representation of `self`
+  if self.isOk: "Ok()"
+  else: "Err(" & $self.err & ")"
 
-#####/////////////////////////#####
-#####// option/result impl ///#####
-#####/////////////////////////#####
-
-####### result api ########
-template ok*[T: not void, E](R: type Result[T, E], x: T): R =
+proc ok*[T, E](R: type Result[T, E], val: T): R =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  R(has: true, val: x)
+  return R(has: true, val: val)
 
-template ok*[E](R: type Result[void, E]): R =
-  ## Initialize a result with a success and value
-  ## Example: `Result[void, string].ok()`
-  R(has: true)
-
-template ok*[T: not void, E](self: var Result[T, E], x: typed) =
+proc ok*[T, E](self: var Result[T, E], val: T) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
-  self = ok(type self, x)
+  self = ok(type self, val)
 
-template ok*[E](self: var Result[void, E]) =
-  ## Set the result to success and update value
-  ## Example: `result.ok()`
-  self = (type self).ok()
+proc ok*(v: auto): auto = 
+  return ok(typeof(result), v)
 
-template ok*(v: auto): auto = 
-  ok(typeof(result), v)
-
-template ok*(): auto = 
-  ok(typeof(result))
-
-template err*[T; E: not void](R: type Result[T, E], x: typed): R =
+proc err*[T, E](R: type Result[T, E], err: T): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(has: false, err: x)
+  return R(has: false, err: err)
 
-template err*[T](R: type Result[T, cstring], x: string): R =
+proc err*[T](R: type Result[T, cstring], str: string): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  const s = x # avoid dangling cstring pointers
+  const s = str # ?
   R(has: false, err: cstring(s))
 
-template err*[T](R: type Result[T, void]): R =
-  ## Initialize the result to an error
-  ## Example: `Result[int, void].err()`
-  R(has: false)
+proc err*[T](R: type Result[T, void]): R =
+  return R(has: false)
 
-template err*[T; E: not void](self: var Result[T, E], x: untyped) =
+proc err*[T, E](self: var Result[T, E], err: E) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
-  self = err(type self, x)
+  self = err(type self, err)
 
-template err*[T](self: var Result[T, cstring], x: string) =
-  const s = x # Make sure we don't return a dangling pointer
+proc err*[T](self: var Result[T, cstring], str: string) =
+  const s = str # Make sure we don't return a dangling pointer
   self = err(type self, cstring(s))
 
-template err*[T](self: var Result[T, void]) =
+proc err*[T](self: var Result[T, void]) =
   ## Set the result as an error
   ## Example: `result.err()`
   self = err(type self)
 
-template err*(v: auto): auto = 
-  err(typeof(result), v)
+proc err*(e: auto): auto = 
+  return err(typeof(result), e)
 
-template err*(): auto = 
-  err(typeof(result))
 
-func value*[T, E](self: Result[T, E]): lent T {.inline.} =
+proc unsafeGet*[T, E](self: var Result[T, E]): var T =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert isOk(self)
+  result = self.v
+
+proc unsafeGet*[T, E](self: Result[T, E]): lent T =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert isOk(self)
+  result = self.v
+
+proc val*[T: not void, E](self: Result[T, E]): lent T =
   ## Fetch value of result if set, or raise Defect
-  ## Exception bridge mode: raise given Exception instead
-  ## See also: Option.get
-  case self.has
-  of true:
-    when T isnot void:
-      self.val
-    else: discard
-  of false:
-    raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value")
+  assertOk(self)
+  self.val
 
-proc value*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
+proc val*[T: not void, E](self: var Result[T, E]): var T =
   ## Fetch value of result if set, or raise Defect
-  ## Exception bridge mode: raise given Exception instead
-  ## See also: Option.get
-  case self.has
-  of true:
-      result = (addr self.val)[]
-  of false:
-    raise (ref UnpackDefect)(msg: "Trying to unpack a Result which doesn't have a value") 
+  assertOk(self)
+  self.val
 
-template isOk*(self: Result): bool = 
-  self.has
-
-template isErr*(self: Result): bool = 
-  self.has.not
-
-
-
-####### option api ########
-proc isSome*[T](self: Option[T]): bool {.inline.} = self.isOk
-proc isNone*[T](self: Option[T]): bool {.inline.} = self.isErr
-
-proc some*[T](val: sink T): Option[T] {.inline.} =
-  ## Returns an `Option` that has the value `val`.
-  Option[T](has: true, val: val)
-
-proc none*(T: typedesc): Option[T] {.inline.} =
-  ## Returns an `Option` for this type that has no value.
-  discard
-
-proc none*[T]: Option[T] {.inline.} =
-  ## Alias for `none(T) <#none,typedesc>`_.
-  none(T)
-
-template get*[T, E](self: Result[T, E]): lent T =
-  mixin value
-  self.value
-
-proc `==`*[T, E](a, b: Result[T, E]): bool {.inline.} =
-  when T is SomePointer:
-    a.val == b.val 
+proc expect*[T: not void, E](self: Result[T, E], m: string): lent T {.raises:[UnpackDefect], discardable.} =
+  if self.isOk:
+    self.val
   else:
-    (a.isSome and b.isSome and a.val == b.val) or (a.isNone and b.isNone)
+    raise (ref UnpackDefect)(msg: m)
+
+
+
+# ----- Generic Combinators ----- #
+
+
+proc map*[T, R, E](
+    self: sink Result[T, E]; 
+    fn: Callable[T, R]
+  ): Result[R, E] {.effectsOf: fn.} =
+  case self.isOk
+  of true:
+    when R is void:
+      fn(self.val)
+      result.ok()
+    else:
+      result.ok fn(self.val)
+  of false:
+    when E is void:
+      result.err()
+    else:
+      result.err self.err
+
+proc map_or*[T, R: not void, E](
+    self: sink Result[T, E], 
+    fn: Callable[T, R],
+    default: R
+  ): R {.effectsOf: fn.} =
+  case self.isOk
+  of true:  fn(self.get)
+  of false: default
+
+proc `and`*[T, E: not void](self, res: sink Result[T, E]): Result[T, E] =
+  case self.isOk
+  of true:  res
+  of false: self
+
+proc and_then*[T, R, E](
+    self: sink Result[T, E];
+    fn: Callable[T, Result[R, E]]
+  ): Result[R, E] {.effectsOf: fn.} =
+  case self.isOk
+  of true:
+    when R is void:
+      return fn()
+    else:
+      return fn(self.val)
+  of false:
+    when E is void:
+      result.err()
+    else:
+      result.err(self.err)
+
+proc `or`*[T, E: not void](self, res: sink Result[T, E]): Result[T, E] =
+  case self.isOk
+  of true:  self
+  of false: res
+
+proc or_else[T, E](
+    self: sink Result[T, E];
+    cb: Callable[T, Result[T, E]]
+  ): Result[T, E] {.effectsOf: cb.} = 
+  case self.isOk
+  of true:  self
+  of false: cb(self.err)
 
 
 #####/////////////////////////#####
-#####// Generic Combinators //#####
+#####////// Option API ///////#####
 #####/////////////////////////#####
 
 
-proc map*[T, E, R](self: sink Result[T, E], cb: Callable[T, R]): Result[R, E] {.effectsOf: cb.} =
+
+# ----- Generic Combinators and other FP utilities ----- #
+
+
+proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
   case self.isSome
-  of true:  result.ok(cb(self.get))
-  of false: none(R)
+  of true:  some[U](cb(self.unsafeGet))
+  of false: none(U)
 
 proc map_or*[T, R](self: sink Option[T], default: R, cb: Callable[T, R]): R {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
@@ -201,10 +243,6 @@ proc unzip*[T; R](self: sink Option[(T, R)]): (Option[T], Option[R]) =
     (self.get[0], self.get[1])
   else:
     (none(T), none(R))
-
-#####//////////////////////////////////////////////////////#####
-#####// Boolean operations on the values, eager and lazy //#####
-#####//////////////////////////////////////////////////////#####
 
 proc `and`*[T](self, opt: sink Option[T]): Option[T] =
   ## Returns `None` if `self` is `None`, otherwise returns `opt`.
@@ -290,33 +328,12 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
 #     )()
     
 
-#####/////////////////////////#####
-#####// optional operators  //#####
-#####/////////////////////////#####
-
-
-
-
-proc `|?`*[T](option: sink Option[T], fallback: sink T): T  =
-  ## Use the `|?` operator to supply a fallback value when an Option does not hold a value.
-  if option.isSome:
-    option.get()
-  else:
-    fallback
-
-
 
 #####/////////////////////////#####
 #####//         etc         //#####
 #####/////////////////////////#####
 
-proc replace[T](dest: var T, src: sink T): T =
-  ## like `swap` but returns the swapped value 
-  # TODO: should go in some other module
-  swap(dest, src)
-  result = dest
   
-
 proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discardable.} =
   ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
   ## - If the value is a none(T) this function panics with a message.
@@ -345,3 +362,4 @@ proc take*[T](self: sink Option[T]): Option[T] =
 #####/////////////////////////#####
 when isMainModule:
   echo some("stuff").expect("works")
+

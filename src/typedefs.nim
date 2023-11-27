@@ -83,6 +83,15 @@ else:
     SomePointer* = ref | ptr | pointer
 
 type
+    RCachableError* {.acyclic.} = object of CatchableError
+        ## Abstract class for all exceptions that can be tagged and preallocated.
+        data*: array[sizeof(CatchableError) * 3, byte] # preallocated refs
+
+    UnpackDefect* = object of Defect
+
+    ResultError*[E] = object of ValueError
+      err*: E
+  
     Iterator*[T] = (iterator: T) or (iterator: lent T)
 
 
@@ -91,9 +100,6 @@ type
     BranchPair*[T] = object
         then*, otherwise*: T
 
-    ## Abstract class for all exceptions that can be tagged and preallocated.
-    RCachableError* {.acyclic.} = object of CatchableError
-        data*: array[sizeof(CatchableError) * 3, byte] # preallocated refs
 
     Place* = object
         tagged*: array[preallocEC, (ref RCachableError)]
@@ -106,9 +112,14 @@ type
         when defined(nimArcDebug) or defined(nimArcIds):
             refId: int
 
-
-
-
-
-
+    Result*[T, E] = object  
+      case has: bool
+      of false:
+        when E is not void: 
+          err: E
+        else: discard
+      of true:
+        when T is not void: 
+          val: T
+        else: discard
 
