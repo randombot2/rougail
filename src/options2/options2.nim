@@ -249,9 +249,10 @@ proc flatten*[T](self: Option[Option[T]]): Option[T] =
   of false: none(T)
 
 proc zip*[T; R](self: sink Option[T], opt: sink Option[R]): Option[(T, R)] =
-  case (self.isSome, opt.isSome)
-  of (true, true): some (self.get, opt.unsafGet)
-  else: none (T, R)
+  if self.isSome and opt.isSome:
+    some (self.get, opt.get)
+  else: 
+    none (T, R)
 
 proc unzip*[T; R](self: sink Option[(T, R)]): (Option[T], Option[R]) =
   if self.isSome:
