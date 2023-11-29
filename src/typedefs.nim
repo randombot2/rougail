@@ -112,14 +112,3 @@ type
         when defined(nimArcDebug) or defined(nimArcIds):
             refId: int
 
-    Result*[T, E] = object  
-      case has: bool
-      of false:
-        when E is not void: 
-          err: E
-        else: discard
-      of true:
-        when T is not void: 
-          val: T
-        else: discard
-
