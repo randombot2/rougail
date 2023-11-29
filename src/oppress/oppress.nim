@@ -423,11 +423,20 @@ proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discar
 #####/////////////////////////#####
 when isMainModule:
   import sugar
-  proc lol(x: string): Option[string] = some x & "heh"
+  proc test(x: string): Option[string] = some x & "heh"
+  
   none(string)
-    .and_then(lol)
+    .and_then(test)
     .or_else(() => some "stranger")
-    .filter((x: string) => x != "stranger")
+    .filter((x: string) => (block: 
+      echo x
+      x != "stranger"
+    ))
+    .or_else(() => some "badass")
+    .take_if((x: string) => (block:
+      echo x
+      x == "badass"
+    ))
     .echo
   
 
