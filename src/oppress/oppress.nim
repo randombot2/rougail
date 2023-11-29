@@ -6,6 +6,9 @@
 
 import macros, std/genasts, sugar
 import ../typedefs
+from std/options import Option, isSome, isNone, get, none, some, `==`, `$`
+export Option, isSome, isNone, get, none, some, `==`, `$`
+import std/importutils; privateAccess(Option);
 
 
 type
@@ -15,6 +18,7 @@ type
       e: E
     of true:
       v: T
+
   OCallable[T; R] = (proc(x: T): Option[R] {.nimcall.}) | (proc(x: T): Option[R] {.closure.}) | (proc(x: T): Option[R] {.inline.})  
   VOCallable[R] = (proc(): Option[R] {.nimcall.}) | (proc(): Option[R] {.closure.}) | (proc(): Option[R] {.inline.})  
   
@@ -302,9 +306,6 @@ proc `$`*[E](self: Result[void, E]): string =
 #####/////////////////////////#####
 #####////// Option API ///////#####
 #####/////////////////////////#####
-from std/options import Option, isSome, isNone, get, none, some, `==`, `$`
-export Option, isSome, isNone, get, none, some, `==`, `$`
-import std/importutils; privateAccess(Option);
 
 
 
@@ -312,7 +313,7 @@ import std/importutils; privateAccess(Option);
 
 proc map*[T, U](self: sink Option[T], cb: Callable[T, U]): Option[U] {.effectsOf: cb.} =
   ## Applies a `cb` function to the value of the `Option` and returns an `Option` containing the new value.
-  case self.isSome
+  case self.has
   of true:  some[U](cb(self.val))
   of false: none(U)
 
@@ -321,7 +322,7 @@ proc map_or*[T, R](self: sink Option[T],
     default: R
   ): R {.effectsOf: cb.} =
   ## Returns the provided default result (if none), or applies a function to the contained value (if any).
-  case self.isSome
+  case self.has
   of true:  cb(self.val)
   of false: default
 
@@ -330,34 +331,34 @@ proc map_or_else*[T, R](self: sink Option[T];
     default: Callable[void, R]
   ): R {.effectsOf: cb.} =
   ## Computes a default function result (if none), or applies a different function to the contained value (if any).
-  case self.isSome
+  case self.has
   of true:  cb(self.val)
   of false: default()
 
 proc `or`*[T](self, opt: sink Option[T]): Option[T] =
   ## Returns `self` if it contains a value, otherwise returns `opt`.
-  case self.isSome
+  case self.has
   of true:  self
   of false: opt
   
 proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
-  ## Returns some(T) if exactly one of `self` and `opt` isSome() is true, otherwise returns none(T).
-  if self.isSome and opt.isNone:
+  ## Returns some(T) if exactly one of `self` and `opt` has is true, otherwise returns none(T).
+  if self.has and opt.isNone:
     result = self
-  elif self.isNone and opt.isSome:
+  elif self.isNone and opt.has:
     result = opt
   else:
     result = none(T)
 
 proc or_else[T, R](self: sink Option[T], cb: VOCallable[R]): Option[R] {.effectsOf: cb.} = 
   ## Returns `self` if it contains a value, otherwise calls `cb` and returns it's result.
-  case self.isSome
+  case self.has
   of true:  self
   of false: cb()
 
 proc `and`*[T](self, opt: sink Option[T]): Option[T] =
   ## Returns `None` if `self` is `None`, otherwise returns `opt`.
-  case self.isSome
+  case self.has
   of true:  opt
   of false: none(T)
 
@@ -365,7 +366,7 @@ proc `and`*[T](self, opt: sink Option[T]): Option[T] =
 proc and_then*[T, R](self: sink Option[T], cb: OCallable[T, R]): Option[R] {.effectsOf: cb.} =
   ## A renamed version of the std/option's `flatMap` where `self` and the argument of `cb` can be consumed.
   ## If the `Option` has no value, `none(R)` will be returned.
-  case self.isSome
+  case self.has
   of true: cb(self.get)
   of false: none(R)
 
@@ -373,24 +374,24 @@ proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effect
   ## Returns None if the option is None, otherwise calls predicate with the wrapped value and returns:
   ## - Some(T) if predicate returns true (where t is the wrapped value), and
   ## - None if predicate returns false.
-  if self.isSome and not cb(self.val):
+  if self.has and not cb(self.val):
     result = none(T)
   else:
     result = self
 
 proc flatten*[T](self: Option[Option[T]]): Option[T] =
-  case self.isSome
+  case self.has
   of true:  self.val
   of false: none(T)
 
 proc zip*[T; R](self: sink Option[T], opt: sink Option[R]): Option[(T, R)] =
-  if self.isSome and opt.isSome:
+  if self.has and opt.has:
     some (self.val, opt.val)
   else: 
     none typedesc[(T, R)]
 
 proc unzip*[T; R](self: sink Option[(T, R)]): (Option[T], Option[R]) =
-  if self.isSome:
+  if self.has:
     (self.val[0], self.val[1])
   else:
     (none(T), none(R))
@@ -401,7 +402,7 @@ proc take*[T](self: sink Option[T]): Option[T] =
   replace(result, none(T))
 
 proc take_if*[T](self: sink Option[T], pred: Callable[T, bool]): Option[T] =
-  case self.isSome and pred(self.val)
+  case self.has and pred(self.val)
   of true:  take(self)
   of false: self
 
@@ -409,7 +410,7 @@ proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discar
   ## Returns the contained some(value), consuming the self value. This is like `get` but more handy.
   ## - If the value is a none(T) this function panics with a message.
   ## - `expect` should be used to describe the reason you expect the Option should be Some.
-  case self.isSome
+  case self.has
   of true:
     self.val
   of false:
