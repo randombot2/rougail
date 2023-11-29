@@ -1,9 +1,10 @@
 ## extended/customized std/option and nim-result adapted from rust (mostly) with sink optimizations.
 ## 
 
-{.push raises: [], inline.}
+{.experimental: "strictDefs".}
+#{.push raises: [], inline.}
 
-import macros, std/genasts
+import macros, std/genasts, sugar
 import ../typedefs
 
 
@@ -150,15 +151,15 @@ proc map*[T, R, E](
   case self.has
   of true:
     when R is void:
-      fn(self.val)
+      fn(self.v)
       result.ok()
     else:
-      result.ok fn(self.val)
+      result.ok fn(self.v)
   of false:
     when E is void:
       result.err()
     else:
-      result.err self.err
+      result.err self.e
 
 proc map_or*[T, R: not void, E](
     self: sink Result[T, E]; 
@@ -166,7 +167,7 @@ proc map_or*[T, R: not void, E](
     default: R
   ): R {.effectsOf: fn.} =
   case self.has
-  of true:  fn(self.val)
+  of true:  fn(self.v)
   of false: default
 
 proc map_or_else*[T, R, E](
@@ -175,7 +176,7 @@ proc map_or_else*[T, R, E](
     default: Callable[void, R]
   ): R {.effectsOf: fn.} =
   case self.has
-  of true:  fn(self.val)
+  of true:  fn(self.v)
   of false: default()
 
 proc `or`*[T, E: not void](self, res: sink Result[T, E]): Result[T, E] =
@@ -189,7 +190,7 @@ proc or_else[T, E](
   ): Result[T, E] {.effectsOf: cb.} = 
   case self.has
   of true:  self
-  of false: cb(self.err)
+  of false: cb(self.e)
 
 proc `and`*[T, E: not void](self, res: sink Result[T, E]): Result[T, E] =
   case self.has
@@ -205,12 +206,12 @@ proc and_then*[T, R, E](
     when R is void:
       return fn()
     else:
-      return fn(self.val)
+      return fn(self.v)
   of false:
     when E is void:
       result.err()
     else:
-      result.err(self.err)
+      result.err(self.e)
 
 
 # ---- Exceptions ---- #
@@ -242,7 +243,7 @@ proc expect*[T, E](self: sink Result[T, E], m: string): lent T {.raises:[UnpackD
   case self.has
   of true:
     when T isnot void:
-      self.val
+      self.v
   of false:
     raise (ref UnpackDefect)(msg: m)
 
@@ -252,7 +253,7 @@ proc tryValue*[T, E](self: sink Result[T, E], m: sink string = ""): lent T {.rai
   case self.has
   of true:
     when T isnot void:
-      self.val
+      self.v
   of false:
     when E is ref Exception:
       if self.err.isNil:
@@ -346,7 +347,7 @@ proc `xor`*[T](self, opt: sink Option[T]): Option[T]  =
   else:
     result = none(T)
 
-proc or_else[T](self: sink Option[T], cb: Callable[void, Option[T]]): Option[T] {.effectsOf: cb.} = 
+proc or_else[T, R](self: sink Option[T], cb: VOCallable[R]): Option[R] {.effectsOf: cb.} = 
   ## Returns `self` if it contains a value, otherwise calls `cb` and returns it's result.
   case self.isSome
   of true:  self
@@ -356,13 +357,15 @@ proc `and`*[T](self, opt: sink Option[T]): Option[T] =
   ## Returns `None` if `self` is `None`, otherwise returns `opt`.
   case self.isSome
   of true:  opt
-  of false: none T
+  of false: none(T)
 
-proc and_then*[T, R](self: sink Option[T], cb: Callable[T, Option[R]]): Option[R] {.effectsOf: cb.} =
+# (proc(val: T): Option[R])
+proc and_then*[T, R](self: sink Option[T], cb: OCallable[T, R]): Option[R] {.effectsOf: cb.} =
   ## A renamed version of the std/option's `flatMap` where `self` and the argument of `cb` can be consumed.
   ## If the `Option` has no value, `none(R)` will be returned.
-  mixin flatten
-  flatten self.map(cb)
+  case self.isSome
+  of true: cb(self.get)
+  of false: none(R)
 
 proc filter*[T](self: sink Option[T], cb: Callable[T, bool]): Option[T] {.effectsOf: cb.} =
   ## Returns None if the option is None, otherwise calls predicate with the wrapped value and returns:
@@ -416,6 +419,12 @@ proc expect*[T](self: sink Option[T], m = ""): T {.raises:[UnpackDefect], discar
 #####//    sanity checks    //#####
 #####/////////////////////////#####
 when isMainModule:
-  echo some("stuff").expect("works")
+  import sugar
+  proc lol(x: string): Option[string] = some x & "heh"
+  none(string)
+    .and_then(lol)
+    .or_else(() => some "stranger")
+    .filter((x: string) => x != "stranger")
+    .echo
   
 

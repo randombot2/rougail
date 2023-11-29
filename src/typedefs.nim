@@ -38,7 +38,7 @@
 
 
 
-
+from options import Option
 
 # ############################################################
 #
@@ -89,14 +89,16 @@ type
 
     UnpackDefect* = object of Defect
 
-    ResultError*[E] = object of ValueError
+    UnpackError*[E] = object of ValueError
       err*: E
   
     Iterator*[T] = (iterator: T) or (iterator: lent T)
 
 
-    Callable*[T; R] = (proc(x: sink T): R {.closure.}) | (proc(x: sink T): R {.nimcall.}) | (proc(x: sink T): R {.inline.}) 
-    
+    Callable*[T; R] = (proc(x: T): R {.closure.}) | (proc(x: T): R {.nimcall.}) | (proc(x: T): R {.inline.}) 
+    OCallable*[T; R] = (proc(x: T): Option[R] {.nimcall.}) | (proc(x: T): Option[R] {.closure.}) | (proc(x: T): Option[R] {.inline.})  
+    VOCallable*[R] = (proc(): Option[R] {.nimcall.}) | (proc(): Option[R] {.closure.}) | (proc(): Option[R] {.inline.})  
+
     BranchPair*[T] = object
         then*, otherwise*: T
 
