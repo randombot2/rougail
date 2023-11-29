@@ -15,6 +15,8 @@ type
       e: E
     of true:
       v: T
+  OCallable[T; R] = (proc(x: T): Option[R] {.nimcall.}) | (proc(x: T): Option[R] {.closure.}) | (proc(x: T): Option[R] {.inline.})  
+  VOCallable[R] = (proc(): Option[R] {.nimcall.}) | (proc(): Option[R] {.closure.}) | (proc(): Option[R] {.inline.})  
   
 
 

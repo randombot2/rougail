@@ -96,8 +96,6 @@ type
 
 
     Callable*[T; R] = (proc(x: T): R {.closure.}) | (proc(x: T): R {.nimcall.}) | (proc(x: T): R {.inline.}) 
-    OCallable*[T; R] = (proc(x: T): Option[R] {.nimcall.}) | (proc(x: T): Option[R] {.closure.}) | (proc(x: T): Option[R] {.inline.})  
-    VOCallable*[R] = (proc(): Option[R] {.nimcall.}) | (proc(): Option[R] {.closure.}) | (proc(): Option[R] {.inline.})  
 
     BranchPair*[T] = object
         then*, otherwise*: T
